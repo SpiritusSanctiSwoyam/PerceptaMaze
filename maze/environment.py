@@ -41,6 +41,7 @@ class Observation:
 
     room_id: str
     rule_text: str
+    rule: RoomRule
     doors: tuple[Door, ...]
     previous_room: str | None
     status: GameStatus
@@ -98,6 +99,7 @@ class PerceptaMaze:
         return Observation(
             room_id=room.room_id,
             rule_text=room.rule.describe(),
+            rule=room.rule,
             doors=visible_doors,
             previous_room=self.previous_room,
             status=self.status,

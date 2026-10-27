@@ -4,7 +4,7 @@ PerceptaMaze is an AI maze game prototype in which an agent sees only its curren
 
 ## Current status
 
-The first milestone implements the environment, explicit room rules, partial observations, no-backtracking enforcement, terminal outcomes, and unit tests. The Streamlit interface and agent policies will be added in later milestones.
+The environment and deterministic rule-first baseline agent are implemented. The engine enforces room instructions, partial observations, no-backtracking, dead-end losses, and exit wins. Thirteen unit tests currently pass. The Streamlit interface, simulated colour-perception model, and planning agent remain future milestones.
 
 ## Game rules
 
@@ -18,6 +18,25 @@ The first milestone implements the environment, explicit room rules, partial obs
 8. If no available door satisfies the room's instruction, the environment records a loss.
 9. The initial environment is deterministic. Colour-vision-deficiency perception will be a separately documented simulation model, not a claim about every person's perception.
 
+## Rule-first baseline policy
+
+The baseline agent receives an `Observation`, not the environment or complete maze graph. It filters visible doors using the room instruction, then applies a fixed tie-break: **blue → green → red → other colours alphabetically**, followed by door ID. If no door satisfies the rule, or the game is already over, it returns a no-move decision.
+
+Example usage:
+
+```python
+from agents.rule_first import RuleFirstAgent
+from maze.environment import PerceptaMaze
+
+# Given an initialized PerceptaMaze instance named `maze`:
+agent = RuleFirstAgent()
+decision = agent.choose_door(maze.observe())
+if decision.has_move:
+    result = maze.step(decision.door_id)
+else:
+    print(decision.reason)
+```
+
 ## Run tests
 
 Requires Python 3.10 or newer. No third-party packages are needed for the environment tests.
@@ -30,7 +49,7 @@ python -m unittest discover -s tests -v
 
 - [x] Define core environment and rules
 - [x] Add initial unit tests
-- [ ] Add deterministic rule-first baseline agent
+- [x] Add deterministic rule-first baseline agent
 - [ ] Add configurable colour-perception simulation
 - [ ] Add planning agent and evaluation metrics
 - [ ] Build Streamlit interface
