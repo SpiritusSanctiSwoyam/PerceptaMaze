@@ -4,7 +4,7 @@ PerceptaMaze is an AI maze game prototype in which an agent sees only its curren
 
 ## Current status
 
-The environment, deterministic rule-first baseline agent, and configurable simulated colour-perception model are implemented. The engine enforces room instructions, partial observations, no-backtracking, dead-end losses, and exit wins. Nineteen unit tests currently pass. The Streamlit interface and planning agent remain future milestones.
+The environment, deterministic rule-first baseline agent, configurable simulated colour-perception model, and memory-based planning agent are implemented. The engine enforces room instructions, partial observations, no-backtracking, dead-end losses, and exit wins. Unit tests cover the environment and agent behaviour. The Streamlit interface and evaluation metrics remain future milestones.
 
 ## Game rules
 
@@ -35,6 +35,29 @@ if decision.has_move:
     result = maze.step(decision.door_id)
 else:
     print(decision.reason)
+```
+
+## Memory-based planning agent
+
+`agents/planning_agent.py` implements `PlanningAgent`. Unlike the rule-first baseline, it keeps per-episode memory of rooms visited and doors observed. It still receives only the current `Observation`; it cannot inspect the hidden environment graph. Its policy is:
+
+1. Filter doors to those that satisfy the current room instruction.
+2. Prefer a rule-compliant door leading to an unvisited room.
+3. If all immediately legal destinations have been visited, estimate routes to known rooms with unexplored legal exits using breadth-first search over the discovered map.
+4. Use destination and door IDs as deterministic tie-breakers.
+
+Memory is specific to one episode. Call `agent.reset()` before reusing an agent for a new maze. Because the maze is partially observable and backtracking is forbidden, the planner is a heuristic exploration policy, not a guarantee of finding the exit or avoiding every dead end.
+
+Example:
+
+```python
+from agents.planning_agent import PlanningAgent
+
+agent = PlanningAgent()
+observation = maze.observe()
+decision = agent.choose_door(observation)
+if decision.has_move:
+    result = maze.step(decision.door_id)
 ```
 
 ## Simulated colour-perception model
@@ -70,6 +93,7 @@ python -m unittest discover -s tests -v
 - [x] Add initial unit tests
 - [x] Add deterministic rule-first baseline agent
 - [x] Add configurable colour-perception simulation
-- [ ] Add planning agent and evaluation metrics
+- [x] Add memory-based planning agent
+- [ ] Add evaluation metrics
 - [ ] Build Streamlit interface
 - [ ] Deploy to Streamlit Community Cloud
