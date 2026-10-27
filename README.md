@@ -4,7 +4,7 @@ PerceptaMaze is an AI maze game prototype in which an agent sees only its curren
 
 ## Current status
 
-The environment and deterministic rule-first baseline agent are implemented. The engine enforces room instructions, partial observations, no-backtracking, dead-end losses, and exit wins. Thirteen unit tests currently pass. The Streamlit interface, simulated colour-perception model, and planning agent remain future milestones.
+The environment, deterministic rule-first baseline agent, and configurable simulated colour-perception model are implemented. The engine enforces room instructions, partial observations, no-backtracking, dead-end losses, and exit wins. Nineteen unit tests currently pass. The Streamlit interface and planning agent remain future milestones.
 
 ## Game rules
 
@@ -37,6 +37,25 @@ else:
     print(decision.reason)
 ```
 
+## Simulated colour-perception model
+
+`agents/color_perception.py` provides `ColorPerceptionModel` with two modes:
+
+- `PerceptionMode.NORMAL`: preserves the observation unchanged.
+- `PerceptionMode.RED_GREEN_AMBIGUOUS`: maps both red and green labels to the same perceived label (`red-green ambiguous`) while leaving blue distinct.
+
+Example:
+
+```python
+from agents.color_perception import ColorPerceptionModel
+
+real_observation = maze.observe()
+perceived_observation = ColorPerceptionModel().transform(real_observation)
+decision = agent.choose_door(perceived_observation)
+```
+
+This is a deliberately simplified, configurable game abstraction. It is **not** a clinical model and does not claim to represent every person with red–green colour vision deficiency. The environment still validates the selected door against the true room rule, so a perceptual ambiguity can lead to a choice that the real environment rejects.
+
 ## Run tests
 
 Requires Python 3.10 or newer. No third-party packages are needed for the environment tests.
@@ -50,7 +69,7 @@ python -m unittest discover -s tests -v
 - [x] Define core environment and rules
 - [x] Add initial unit tests
 - [x] Add deterministic rule-first baseline agent
-- [ ] Add configurable colour-perception simulation
+- [x] Add configurable colour-perception simulation
 - [ ] Add planning agent and evaluation metrics
 - [ ] Build Streamlit interface
 - [ ] Deploy to Streamlit Community Cloud
