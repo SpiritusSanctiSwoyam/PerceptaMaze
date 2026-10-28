@@ -4,7 +4,7 @@ PerceptaMaze is an AI maze game prototype in which an agent sees only its curren
 
 ## Current status
 
-The environment, deterministic rule-first baseline agent, configurable simulated colour-perception model, and memory-based planning agent are implemented. The engine enforces room instructions, partial observations, no-backtracking, dead-end losses, and exit wins. Unit tests cover the environment and agent behaviour. The Streamlit interface and evaluation metrics remain future milestones.
+The environment, deterministic rule-first baseline agent, configurable simulated colour-perception model, and memory-based planning agent are implemented. The engine enforces room instructions, partial observations, no-backtracking, dead-end losses, and exit wins. Unit tests cover the environment and agent behaviour. The Streamlit interface and evaluation metrics are implemented; deployment to Streamlit Community Cloud is the next milestone.
 
 ## Game rules
 
@@ -121,5 +121,19 @@ The batch runner treats an invalid action as a failed episode so evaluations ter
 - [x] Add configurable colour-perception simulation
 - [x] Add memory-based planning agent
 - [x] Add evaluation metrics
-- [ ] Build Streamlit interface
+- [x] Build Streamlit interface
 - [ ] Deploy to Streamlit Community Cloud
+
+
+## Interactive Streamlit app (Step 6)
+
+Install dependencies and launch the interface from the project root:
+
+```bash
+python -m pip install -r requirements.txt
+streamlit run app.py
+```
+
+The app supports manual play, the rule-first baseline, and the memory-based planning agent. Select one of the fixed benchmark scenarios or the full 4×4 grid maze (`four_by_four`) and switch between normal colour labels and the simplified red–green ambiguity mode. The current room, instruction, perceived door labels, path history, and agent reasoning are shown without passing the hidden maze graph to the agent. The benchmark panel can run the evaluation suite for the selected perception mode.
+
+For deployment, push the project to GitHub and create a Streamlit Community Cloud app with `app.py` as the main file. The `requirements.txt` file lists Streamlit as the UI dependency; core environment and test code use the Python standard library.

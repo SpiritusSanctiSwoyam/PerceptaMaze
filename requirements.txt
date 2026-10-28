@@ -1,2 +1,1 @@
-# The environment and tests currently use only the Python standard library.
-# Streamlit will be added when the UI milestone begins.
+streamlit>=1.40,<2.0
