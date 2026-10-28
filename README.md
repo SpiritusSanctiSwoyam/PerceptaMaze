@@ -87,6 +87,32 @@ Requires Python 3.10 or newer. No third-party packages are needed for the enviro
 python -m unittest discover -s tests -v
 ```
 
+## Evaluation metrics (Step 5)
+
+`evaluation/runner.py` compares the rule-first baseline and memory-based planner on the same five fixed, hand-authored scenarios. It records per-episode outcomes and aggregate metrics without passing the hidden room graph to either agent.
+
+Run the default evaluation from the project root:
+
+```bash
+python -m evaluation.runner
+```
+
+To test the simplified red–green ambiguity model:
+
+```bash
+python -m evaluation.runner --perception red_green_ambiguous
+```
+
+Results are written to `results/episode_results.csv` (one row per agent/scenario) and `results/summary.json` (aggregate metrics). The summary includes:
+
+- **Win rate:** percentage of episodes reaching the exit.
+- **Mean moves:** average successful moves per episode, including episodes that end in a loss.
+- **Rule compliance:** compliant moves divided by all attempted actions. Invalid choices count against compliance.
+- **Dead-end losses** and **no-legal-move losses:** separate counts of these terminal outcomes.
+- **Invalid attempts:** choices that are unavailable, violate the true rule, or fail to select a move when a legal move exists.
+
+The batch runner treats an invalid action as a failed episode so evaluations terminate consistently. In the interactive environment, an invalid action is rejected without moving the player. The benchmark is deliberately small and handcrafted for checking the implementation; results such as a win-rate difference over five scenarios are illustrative, **not statistically significant research evidence**. For a paper, expand the suite with many generated mazes, report the number of episodes, and compare agents on identical seeds.
+
 ## Planned milestones
 
 - [x] Define core environment and rules
@@ -94,6 +120,6 @@ python -m unittest discover -s tests -v
 - [x] Add deterministic rule-first baseline agent
 - [x] Add configurable colour-perception simulation
 - [x] Add memory-based planning agent
-- [ ] Add evaluation metrics
+- [x] Add evaluation metrics
 - [ ] Build Streamlit interface
 - [ ] Deploy to Streamlit Community Cloud

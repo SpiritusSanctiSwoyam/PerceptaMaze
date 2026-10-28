@@ -6,3 +6,6 @@ venv/
 .pytest_cache/
 .coverage
 .DS_Store
+
+# Generated evaluation outputs
+results/
