@@ -1,33 +1,40 @@
 import unittest
+from app_scenarios import PALETTE, interactive_scenarios
 
-from app_scenarios import four_by_four_scenario, interactive_scenarios
-from maze.environment import GameStatus
-from maze.rules import rule_compliant_doors
+class TestTreeScenarios(unittest.TestCase):
+    def test_two_scenarios_each_have_one_gold_exit(self):
+        scenarios = interactive_scenarios()
+        self.assertEqual(len(scenarios), 2)
+        for sc in scenarios:
+            golds = [r for r in sc.rooms.values() if r.is_gold_exit]
+            self.assertEqual(len(golds), 1)
+            self.assertEqual(golds[0].room_id, sc.gold_room)
 
+    def test_every_decision_room_has_three_doors(self):
+        for sc in interactive_scenarios():
+            for room in sc.rooms.values():
+                if not room.is_exit:
+                    self.assertEqual(len(room.doors), 3, room.room_id)
 
-class TestInteractiveScenarios(unittest.TestCase):
-    def test_four_by_four_scenario_has_sixteen_rooms_and_valid_exit(self):
-        scenario = four_by_four_scenario()
-        self.assertEqual(len(scenario.rooms), 16)
-        self.assertTrue(scenario.rooms[scenario.exit_room].is_exit)
-        self.assertEqual(scenario.start_room, "R00")
+    def test_palette_and_rules_vary(self):
+        self.assertEqual(set(PALETTE), {"red", "blue", "green", "yellow", "white", "orange", "purple"})
+        for sc in interactive_scenarios():
+            colors = {d.color for r in sc.rooms.values() for d in r.doors}
+            rules = {(r.rule.kind.value, r.rule.color) for r in sc.rooms.values() if r.doors}
+            self.assertEqual(colors, set(PALETTE))
+            self.assertGreaterEqual(len(rules), 5)
 
-    def test_safe_route_reaches_exit(self):
-        maze = four_by_four_scenario().create_maze()
-        expected = ["R01", "R02", "R03", "R13", "R23", "R33"]
-        for destination in expected:
-            observation = maze.observe()
-            legal = rule_compliant_doors(observation.doors, observation.rule)
-            selected = next((door for door in legal if door.destination == destination), None)
-            self.assertIsNotNone(selected, f"No compliant door to {destination}")
-            result = maze.step(selected.door_id)
-        self.assertIs(result.status, GameStatus.WON)
+    def test_ambiguous_agent_reaches_gold_on_fixed_route(self):
+        from agents.color_perception import ColorPerceptionModel, PerceptionMode
+        from agents.rule_first import RuleFirstAgent
+        from maze.environment import GameStatus
+        model = ColorPerceptionModel(PerceptionMode.RED_GREEN_AMBIGUOUS)
+        for sc in interactive_scenarios():
+            maze = sc.create_maze(); agent = RuleFirstAgent()
+            while maze.status is GameStatus.RUNNING:
+                obs = model.transform(maze.observe())
+                decision = agent.choose_door(obs)
+                maze.step(decision.door_id)
+            self.assertEqual(maze.status, GameStatus.WON, sc.name)
 
-    def test_interactive_scenarios_include_benchmark_and_grid_maze(self):
-        names = {scenario.name for scenario in interactive_scenarios()}
-        self.assertIn("four_by_four", names)
-        self.assertIn("direct_exit", names)
-
-
-if __name__ == "__main__":
-    unittest.main()
+if __name__ == "__main__": unittest.main()

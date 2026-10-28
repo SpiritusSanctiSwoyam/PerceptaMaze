@@ -1,85 +1,97 @@
-"""Interactive-only scenarios, including a 4x4 grid maze for the UI."""
-
-from __future__ import annotations
-
-from evaluation.runner import Scenario, scenario_suite
-from maze.environment import Door, Room
+"""Two fixed three-door tree scenarios with one Gold leaf each."""
+from dataclasses import dataclass
+from typing import Mapping
+from maze.environment import Door, PerceptaMaze, Room
 from maze.rules import RoomRule, RuleKind
 
+PALETTE = ("red", "blue", "green", "yellow", "white", "orange", "purple")
 
-def four_by_four_scenario() -> Scenario:
-    """Create a 4x4 maze with a narrow safe route and off-route dead ends.
+@dataclass(frozen=True)
+class Scenario:
+    name: str
+    description: str
+    rooms: Mapping[str, Room]
+    start_room: str
+    gold_room: str
+    def create_maze(self) -> PerceptaMaze:
+        return PerceptaMaze(self.rooms, self.start_room, self.gold_room)
 
-    The grid coordinates are used only to build the environment. They are not
-    included in observations, so neither agent can inspect the hidden layout.
-    """
-    exit_coord = (3, 3)
-    safe_path = {
-        (0, 0), (0, 1), (0, 2), (0, 3), (1, 3), (2, 3), (3, 3)
-    }
+
+def _build_scenario(name: str, variant: int) -> Scenario:
     rooms: dict[str, Room] = {}
+    gold_route = {"S": 1, "B": (0 if variant == 1 else 1), "B1" if variant == 1 else "B2": 0}
+    # Rule/colour configurations are deliberately varied. The Gold path has a
+    # single red/green-equivalent target in each relevant room, never both red
+    # and green doors together, so the ambiguity-mode agent is not split between them.
+    root_colors = ["blue", "green", "yellow"] if variant == 1 else ["yellow", "green", "purple"]
+    root_rule = RoomRule(RuleKind.CHOOSE, "red")
+    rooms["S"] = Room("S", root_rule, tuple(Door(f"S-{i}", color, dest) for i, (color, dest) in enumerate(zip(root_colors, ("A", "B", "C")))), red_green_equivalence=True)
+    level1_rules = [
+        RoomRule(RuleKind.AVOID, "orange"),
+        RoomRule(RuleKind.AVOID, "green"),
+        RoomRule(RuleKind.CHOOSE, "purple"),
+    ]
+    level1_colors = [
+        ["orange", "red", "blue"],
+        ["blue", "red", "yellow"] if variant == 1 else ["yellow", "blue", "red"],
+        ["purple", "white", "orange"],
+    ]
+    for i, node in enumerate(("A", "B", "C")):
+        children = [f"{node}{j}" for j in (1, 2, 3)]
+        rooms[node] = Room(node, level1_rules[i], tuple(Door(f"{node}-{j}", color, dest) for j, (color, dest) in enumerate(zip(level1_colors[i], children))), red_green_equivalence=(node == "B" and variant == 2))
+    level2_rules = [
+        RoomRule(RuleKind.CHOOSE, "yellow"), RoomRule(RuleKind.CHOOSE, "green"), RoomRule(RuleKind.AVOID, "blue"),
+        RoomRule(RuleKind.AVOID, "red"), RoomRule(RuleKind.CHOOSE, "orange"), RoomRule(RuleKind.AVOID, "purple"),
+        RoomRule(RuleKind.CHOOSE, "white"), RoomRule(RuleKind.AVOID, "yellow"), RoomRule(RuleKind.CHOOSE, "blue"),
+    ]
+    level2_colors = [
+        ["yellow", "red", "blue"], ["red", "white", "purple"], ["blue", "orange", "green"],
+        ["green", "yellow", "orange"], ["orange", "blue", "white"], ["red", "green", "purple"],
+        ["white", "blue", "red"], ["yellow", "orange", "green"], ["blue", "purple", "white"],
+    ]
+    node_ids = [f"{parent}{j}" for parent in ("A", "B", "C") for j in (1, 2, 3)]
+    # Ensure the Gold branch's second and third decisions benefit from the
+    # perception mapping but remain unambiguous: only one member of red/green is present.
+    if variant == 1:
+        level2_rules[3] = RoomRule(RuleKind.CHOOSE, "green")
+        level2_colors[3] = ["red", "white", "purple"]
+    else:
+        level2_rules[4] = RoomRule(RuleKind.CHOOSE, "green")
+        level2_colors[4] = ["red", "blue", "white"]
+    for idx, node in enumerate(node_ids):
+        children = [f"{node}x{j}" for j in (1, 2, 3)]
+        is_gold_parent = node == ("B1" if variant == 1 else "B2")
+        if is_gold_parent:
+            # Scenario 1: Gold is door 1 (red) after CHOOSE GREEN.
+            # Scenario 2: Gold is also door 1 (red) after CHOOSE GREEN.
+            rule = RoomRule(RuleKind.CHOOSE, "green")
+            colors = ["red", "white", "purple"]
+            rooms[node] = Room(node, rule, tuple(Door(f"{node}-{j}", color, dest) for j, (color, dest) in enumerate(zip(colors, children))), red_green_equivalence=True)
+        else:
+            rooms[node] = Room(node, level2_rules[idx], tuple(Door(f"{node}-{j}", color, dest) for j, (color, dest) in enumerate(zip(level2_colors[idx], children))))
+    gold_room = "B1x1" if variant == 1 else "B2x1"
+    # Every leaf is an ordinary exit except the one designated Gold exit.
+    for parent in node_ids:
+        for j in (1, 2, 3):
+            rid = f"{parent}x{j}"
+            rooms[rid] = Room(rid, RoomRule(RuleKind.AVOID, "purple"), (), is_exit=True, is_gold_exit=(rid == gold_room))
+    # Gold path at root is B; scenario-specific child; then first leaf.
+    if variant == 1:
+        # B's first child B1 is Gold branch; set B door order to blue, red, yellow;
+        # ambiguous AVOID GREEN avoids red and selects blue first -> B1.
+        rooms["B"] = Room("B", RoomRule(RuleKind.AVOID, "green"), (Door("B-0", "blue", "B1"), Door("B-1", "red", "B2"), Door("B-2", "yellow", "B3")))
+        rooms["B1"] = Room("B1", RoomRule(RuleKind.CHOOSE, "green"), (Door("B1-0", "red", "B1x1"), Door("B1-1", "white", "B1x2"), Door("B1-2", "purple", "B1x3")), red_green_equivalence=True)
+    else:
+        rooms["B"] = Room("B", RoomRule(RuleKind.AVOID, "green"), (Door("B-0", "red", "B1"), Door("B-1", "blue", "B2"), Door("B-2", "yellow", "B3")))
+        rooms["B2"] = Room("B2", RoomRule(RuleKind.CHOOSE, "green"), (Door("B2-0", "red", "B2x1"), Door("B2-1", "blue", "B2x2"), Door("B2-2", "white", "B2x3")), red_green_equivalence=True)
+    return Scenario(name, "Three-door rooted tree; one fixed Gold exit and ordinary exits on other branches.", rooms, "S", gold_room)
 
-    def room_id(row: int, col: int) -> str:
-        return f"R{row}{col}"
 
-    for row in range(4):
-        for col in range(4):
-            coord = (row, col)
-            rid = room_id(row, col)
-            if coord == exit_coord:
-                rooms[rid] = Room(rid, RoomRule(RuleKind.AVOID, "red"), (), is_exit=True)
-                continue
+def scenario_one() -> Scenario:
+    return _build_scenario("scenario_1", 1)
 
-            neighbours: list[tuple[str, tuple[int, int]]] = []
-            for label, (dr, dc) in (("N", (-1, 0)), ("E", (0, 1)), ("S", (1, 0)), ("W", (0, -1))):
-                nr, nc = row + dr, col + dc
-                if 0 <= nr < 4 and 0 <= nc < 4:
-                    neighbours.append((label, (nr, nc)))
-
-            # The designated route always uses a blue door. At the start, a
-            # green door is also legal, making the first decision meaningful.
-            forward: tuple[int, int] | None = None
-            if coord == (0, 0):
-                forward = (0, 1)
-            elif coord in safe_path:
-                if row == 0 and col < 3:
-                    forward = (0, col + 1)
-                elif col == 3 and row < 3:
-                    forward = (row + 1, 3)
-
-            doors: list[Door] = []
-            for label, dest_coord in neighbours:
-                destination = room_id(*dest_coord)
-                if dest_coord == forward:
-                    color = "blue"
-                elif coord == (0, 0) and dest_coord == (1, 0):
-                    color = "green"
-                else:
-                    color = "red" if dest_coord in safe_path else "green"
-                doors.append(Door(f"{rid}-{label}", color, destination))
-
-            if coord == (0, 0):
-                rule = RoomRule(RuleKind.AVOID, "red")
-            elif coord in safe_path:
-                rule = RoomRule(RuleKind.CHOOSE, "blue")
-            else:
-                rule = RoomRule(RuleKind.AVOID, "red")
-            rooms[rid] = Room(
-                rid,
-                rule,
-                tuple(doors),
-                is_dead_end=coord not in safe_path,
-            )
-
-    return Scenario(
-        name="four_by_four",
-        description="A 4×4 grid maze with a hidden safe route and off-route dead ends.",
-        rooms=rooms,
-        start_room="R00",
-        exit_room="R33",
-    )
-
+def scenario_two() -> Scenario:
+    return _build_scenario("scenario_2", 2)
 
 def interactive_scenarios() -> tuple[Scenario, ...]:
-    """Return the benchmark scenarios plus the full 4x4 interactive maze."""
-    return (*scenario_suite(), four_by_four_scenario())
+    return (scenario_one(), scenario_two())

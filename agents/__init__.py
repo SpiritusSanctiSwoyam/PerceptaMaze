@@ -1,6 +1,5 @@
-"""Decision-making agents for PerceptaMaze."""
-
-from .planning_agent import PlanningAgent
+"""PerceptaMaze decision agents."""
 from .rule_first import RuleFirstAgent
-
-__all__ = ["PlanningAgent", "RuleFirstAgent"]
+from .planning_agent import PlanningAgent
+from .gold_hunter import GoldHunterAgent
+__all__ = ["RuleFirstAgent", "PlanningAgent", "GoldHunterAgent"]

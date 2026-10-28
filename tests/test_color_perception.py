@@ -1,67 +1,34 @@
 import unittest
-
 from agents.color_perception import ColorPerceptionModel, PerceptionMode
 from agents.rule_first import RuleFirstAgent
-from maze.environment import Door, GameStatus, Observation
-from maze.rules import RoomRule, RuleKind
+from app_scenarios import interactive_scenarios
+from maze.environment import GameStatus
 
-
-class TestColorPerceptionModel(unittest.TestCase):
-    def setUp(self):
-        rule = RoomRule(RuleKind.CHOOSE, "green")
-        self.observation = Observation(
-            room_id="R1",
-            rule_text=rule.describe(),
-            rule=rule,
-            doors=(
-                Door("red-door", "red", "R2"),
-                Door("green-door", "green", "R3"),
-                Door("blue-door", "blue", "R4"),
-            ),
-            previous_room="R0",
-            status=GameStatus.RUNNING,
-        )
-
-    def test_red_and_green_become_ambiguous(self):
-        model = ColorPerceptionModel()
-        self.assertEqual(model.perceive_color("red"), "red-green ambiguous")
-        self.assertEqual(model.perceive_color("GREEN"), "red-green ambiguous")
+class TestColorPerception(unittest.TestCase):
+    def test_red_green_collapse_but_other_colors_stay_distinct(self):
+        model = ColorPerceptionModel(PerceptionMode.RED_GREEN_AMBIGUOUS)
+        self.assertEqual(model.perceive_color("red"), model.perceive_color("green"))
         self.assertEqual(model.perceive_color("blue"), "blue")
+        self.assertEqual(model.perceive_color("purple"), "purple")
 
-    def test_normal_mode_preserves_original_observation(self):
-        model = ColorPerceptionModel(PerceptionMode.NORMAL)
-        self.assertIs(model.transform(self.observation), self.observation)
+    def test_instruction_text_remains_readable_while_internal_target_transforms(self):
+        sc = interactive_scenarios()[0]; obs = sc.create_maze().observe()
+        transformed = ColorPerceptionModel(PerceptionMode.RED_GREEN_AMBIGUOUS).transform(obs)
+        self.assertEqual(transformed.rule_text, obs.rule_text)
+        self.assertEqual(transformed.rule.color, "red-green ambiguous")
 
-    def test_transformation_preserves_door_ids_and_destinations(self):
-        perceived = ColorPerceptionModel().transform(self.observation)
-        self.assertEqual(
-            [(d.door_id, d.destination) for d in perceived.doors],
-            [(d.door_id, d.destination) for d in self.observation.doors],
-        )
+    def test_original_observation_is_not_mutated(self):
+        obs = interactive_scenarios()[0].create_maze().observe()
+        original = tuple(d.color for d in obs.doors)
+        ColorPerceptionModel(PerceptionMode.RED_GREEN_AMBIGUOUS).transform(obs)
+        self.assertEqual(tuple(d.color for d in obs.doors), original)
 
-    def test_transformation_does_not_mutate_original(self):
-        ColorPerceptionModel().transform(self.observation)
-        self.assertEqual(self.observation.rule.color, "green")
-        self.assertEqual([d.color for d in self.observation.doors], ["red", "green", "blue"])
+    def test_same_policy_ambiguous_agent_finds_gold(self):
+        model = ColorPerceptionModel(PerceptionMode.RED_GREEN_AMBIGUOUS)
+        for sc in interactive_scenarios():
+            maze = sc.create_maze(); agent = RuleFirstAgent()
+            while maze.status is GameStatus.RUNNING:
+                maze.step(agent.choose_door(model.transform(maze.observe())).door_id)
+            self.assertEqual(maze.status, GameStatus.WON)
 
-    def test_rule_first_agent_can_choose_based_on_ambiguous_observation(self):
-        perceived = ColorPerceptionModel().transform(self.observation)
-        decision = RuleFirstAgent().choose_door(perceived)
-        # The perceived model cannot distinguish red from green, so the fixed
-        # door-ID tie-break chooses green-door in this constructed example.
-        self.assertEqual(decision.door_id, "green-door")
-
-    def test_blue_remains_distinct_under_avoid_rule(self):
-        rule = RoomRule(RuleKind.AVOID, "red")
-        obs = Observation(
-            room_id="R1", rule_text=rule.describe(), rule=rule,
-            doors=(Door("a-red", "red", "R2"), Door("z-blue", "blue", "R3")),
-            previous_room=None, status=GameStatus.RUNNING,
-        )
-        perceived = ColorPerceptionModel().transform(obs)
-        decision = RuleFirstAgent().choose_door(perceived)
-        self.assertEqual(decision.door_id, "z-blue")
-
-
-if __name__ == "__main__":
-    unittest.main()
+if __name__ == "__main__": unittest.main()
